@@ -62,38 +62,43 @@ UserSchema.virtual('currentPassword')
 .get(function(){ return this._currentPassword})
 .set(function(value){this._currentPassword=value;});
 
-const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,16}$/;  //validation할 패스워드
-const errorMessage = "영문자 8글자 이상은 적어주세요";
 
-UserSchema.path('password').validate(function(v){
-  var user = this;
+let passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,16}$/;
+let passwordRegexErrorMessage = 'Should be minimum 8 characters of alphabet and number combination!';
+UserSchema.path('password').validate(function(v) {
+  let user = this;
 
-  if(!user.isNew){
+  // create user
+  if(user.isNew){
     if(!user.passwordConfirmation){
-      user.invalidate('passwordConfirmation', "password confirmation is required");
+      user.invalidate('passwordConfirmation', 'Password Confirmation is required.');
     }
 
-    if(user.password !== user.passwordConfirmation){
-      user.invalidate('passwordConfirmation', "password confirmation does not matched");
+    if(!passwordRegex.test(user.password)){
+      user.invalidate('password', passwordRegexErrorMessage);
     }
-  }
-
-
-
-  if(!user.isNew)
-  {
-    if(!user.currentPassword)
-    {
-      user.invalidate("currentPassword","currentPassword is required");
-    } else if(!bcrypt.compareSync(user.currentPassword, user.originalPassword)){
-      user.invalidate("currentPassword", "currentPassword is invaild");
-    }
-
-    if(user.newPassword !== user.passwordConfirmation) {
+    else if(user.password !== user.passwordConfirmation) {
       user.invalidate('passwordConfirmation', 'Password Confirmation does not matched!');
     }
   }
-})
+
+  // update user
+  if(!user.isNew){
+    if(!user.currentPassword){
+      user.invalidate('currentPassword', 'Current Password is required!');
+    }
+    else if(!bcrypt.compareSync(user.currentPassword, user.originalPassword)){
+      user.invalidate('currentPassword', 'Current Password is invalid!');
+    }
+
+    if(user.newPassword && !passwordRegex.test(user.newPassword)){
+      user.invalidate("newPassword", passwordRegexErrorMessage);
+    }
+    else if(user.newPassword !== user.passwordConfirmation) {
+      user.invalidate('passwordConfirmation', 'Password Confirmation does not matched!');
+    }
+  }
+});
 
 
 

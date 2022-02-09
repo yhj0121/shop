@@ -6,6 +6,12 @@ const mongoose = require('mongoose');
 const userRouter = require('./router/auth.js');
 const homeRouter = require('./router/home.js');
 const methodOverride = require('method-override');
+const expressSession = require('express-session');
+const passport = require('./passport.js');
+const flash = require('connect-flash'); // 1
+const postRouter = require('./router/post.js')
+
+
 const app = express();
 const  config  = require('./config.js');
 
@@ -25,9 +31,25 @@ app.use(cors());
 app.use(morgan('tiny'));
 app.use(express.urlencoded({extended:false}));
 app.use(methodOverride('_method'));
+app.use(flash());
+app.use(expressSession({
+  secret: 'mykey',
+  resave: true,
+  saveUninitialized: true
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.use((req,res,next) =>{
+  res.locals.isAuthenticated = req.isAuthenticated();
+  res.locals.currentUser = req.user;
+  next();
+
+});
 
 app.use('/', homeRouter);
 app.use('/users', userRouter );
+app.use('/posts', postRouter );
 
 
 

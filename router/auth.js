@@ -4,59 +4,79 @@ const  User  = require('../model/User.js');
 const router = express.Router();
 
 
-
-router.get('/', (req,res) =>{
+// Index
+router.get('/', function(req, res){
   User.find({})
-  .sort({username:1})
-  .exec((err,users) => {
-    if(err) return res.json(err);
-    res.render('users/index.ejs', {users:users})
-  })
-})
+    .sort({username:1})
+    .exec(function(err, users){
+      if(err) return res.json(err);
+      res.render('users/index', {users:users});
+    });
+});
 
-router.get('/new', (req,res) =>{
-  res.render('users/new.ejs');
-})
+// New
+router.get('/new', function(req, res){
+  let user = req.flash('user')[0] || {};
+  let errors = req.flash('errors')[0] || {};
+  res.render('users/new', { user:user, errors:errors });
+});
 
-router.post('/', (req,res) =>{
-  User.create(req.body, (err,user) =>{
-    if(err) return res.json(err);
+// create
+router.post('/', function(req, res){
+  User.create(req.body, function(err, user){
+    if(err){
+      req.flash('user', req.body);
+      req.flash('errors', parseError(err));
+      return res.redirect('/users/new');
+    }
     res.redirect('/users');
-  })
-})
-
-
-router.get('/:username', function(req, res){
-  User.findOne({username:req.params.username}, function(err, user){
-    if(err) return res.json(err);
-    res.render('users/show.ejs', {user:user});
   });
 });
 
-
-router.get('/:username/edit', (req,res) =>{
-  User.findOne({username:req.params.username}, (err,user) =>{
+// show
+router.get('/:username', function(req, res){
+  User.findOne({username:req.params.username}, function(err, user){
     if(err) return res.json(err);
-    res.render('users/edit.ejs' ,{user:user})
-  })
-})
+    res.render('users/show', {user:user});
+  });
+});
 
+// edit
+router.get('/:username/edit', function(req, res){
+  let user = req.flash('user')[0];
+  let errors = req.flash('errors')[0] || {};
+  if(!user){
+    User.findOne({username:req.params.username}, function(err, user){
+      if(err) return res.json(err);
+      res.render('users/edit', { username:req.params.username, user:user, errors:errors });
+    });
+  }
+  else {
+    res.render('users/edit', { username:req.params.username, user:user, errors:errors });
+  }
+});
+
+// update
 router.put('/:username', function(req, res, next){
-  User.findOne({username:req.params.username}) // 2-1
-    .select('password') // 2-2
+  User.findOne({username:req.params.username})
+    .select('password')
     .exec(function(err, user){
       if(err) return res.json(err);
 
       // update user object
       user.originalPassword = user.password;
-      user.password = req.body.newPassword? req.body.newPassword : user.password; // 2-3
-      for(var p in req.body){ // 2-4
+      user.password = req.body.newPassword? req.body.newPassword : user.password;
+      for(let p in req.body){
         user[p] = req.body[p];
       }
 
       // save updated user
       user.save(function(err, user){
-        if(err) return res.json(err);
+        if(err){
+          req.flash('user', req.body);
+          req.flash('errors', parseError(err));
+          return res.redirect('/users/'+req.params.username+'/edit');
+        }
         res.redirect('/users/'+user.username);
       });
   });
@@ -72,3 +92,20 @@ router.delete('/:username', function(req, res){
 
 module.exports = router;
 
+// functions
+function parseError(errors){
+  let parsed = {};
+  if(errors.name == 'ValidationError'){
+    for(let name in errors.errors){
+      let validationError = errors.errors[name];
+      parsed[name] = { message:validationError.message };
+    }
+  }
+  else if(errors.code == '11000' && errors.errmsg.indexOf('username') > 0) {
+    parsed.username = { message:'This username already exists!' };
+  }
+  else {
+    parsed.unhandled = JSON.stringify(errors);
+  }
+  return parsed;
+}
